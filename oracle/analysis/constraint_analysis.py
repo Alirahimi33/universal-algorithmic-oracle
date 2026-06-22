@@ -1,5 +1,6 @@
 """Constraint satisfaction solver using python-constraint."""
 import logging
+from oracle.utils.safe_eval import safe_constraint_eval
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,10 @@ class ConstraintSolver:
                     if c.get("type") == "alldifferent":
                         problem.addConstraint(AllDifferentConstraint(), c.get("variables", []))
                     elif c.get("function"):
-                        func = eval(c["function"]) if isinstance(c["function"], str) else c["function"]
+                        if isinstance(c["function"], str):
+                            func = safe_constraint_eval(c["function"], c.get("variables", []))
+                        else:
+                            func = c["function"]
                         problem.addConstraint(func, c.get("variables", []))
 
             solutions = problem.getSolutions()

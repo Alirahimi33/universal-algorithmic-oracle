@@ -121,7 +121,8 @@ class InfrastructureUtilities:
         if mp:
             mp.mp.dps = precision
             return str(mp.eval(expression))
-        return str(eval(expression))
+        from oracle.utils.safe_eval import safe_eval
+        return str(safe_eval(expression))
 
     @staticmethod
     def dataframe_operation(data: dict, operation: str = "sort") -> dict:

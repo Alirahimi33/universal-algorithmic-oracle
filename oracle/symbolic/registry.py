@@ -128,6 +128,14 @@ def register_all():
 
 
 def get_system(system_id: str) -> SymbolicSystemWrapper | None:
+    """Get a symbolic system wrapper by its ID.
+    
+    Args:
+        system_id: The unique identifier of the symbolic system.
+        
+    Returns:
+        The SymbolicSystemWrapper instance, or None if not found.
+    """
     if system_id not in _registry:
         if system_id in _classes:
             _registry[system_id] = _classes[system_id]()
@@ -142,11 +150,29 @@ def get_system(system_id: str) -> SymbolicSystemWrapper | None:
 
 
 def list_systems() -> list[str]:
+    """List all registered symbolic system IDs.
+    
+    Returns:
+        List of system ID strings.
+    """
     register_all()
     return list(_classes.keys())
 
 
 def compute_system(system_id: str, entropy_packet: dict, params: dict | None = None):
+    """Compute output for a symbolic system.
+    
+    Args:
+        system_id: The unique identifier of the symbolic system.
+        entropy_packet: The entropy data packet to process.
+        params: Optional parameters for the computation.
+        
+    Returns:
+        SymbolicOutput with the computation results.
+        
+    Raises:
+        ValueError: If the system_id is not found.
+    """
     system = get_system(system_id)
     if system is None:
         raise ValueError(f"Unknown symbolic system: {system_id}")

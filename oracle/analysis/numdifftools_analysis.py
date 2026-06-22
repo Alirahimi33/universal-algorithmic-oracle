@@ -1,6 +1,7 @@
 """Numerical differentiation using numdifftools."""
 import logging
 import numpy as np
+from oracle.utils.safe_eval import safe_lambda_eval
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,10 @@ class NumericalDifferentiationAnalyzer:
         if not self.available:
             return {"error": "numdifftools not available"}
         try:
-            func = eval(f"lambda x: {func_str}") if isinstance(func_str, str) else func_str
+            if isinstance(func_str, str):
+                func = safe_lambda_eval(func_str, ["x"])
+            else:
+                func = func_str
             deriv = nd.Derivative(func, n=n)
             result = deriv(x0)
             return {
@@ -38,7 +42,7 @@ class NumericalDifferentiationAnalyzer:
         if not self.available:
             return {"error": "numdifftools not available"}
         try:
-            funcs = [eval(f"lambda x: {f}") for f in func_strs]
+            funcs = [safe_lambda_eval(f, ["x"]) for f in func_strs]
             jacobian = nd.Jacobian(lambda x: [f(x) for f in funcs])
             result = jacobian(np.array(x0))
             return {
