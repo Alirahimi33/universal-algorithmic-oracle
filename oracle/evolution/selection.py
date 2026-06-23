@@ -3,12 +3,23 @@ import random
 import math
 from ..genome.chromosome import Chromosome
 
+# Canonical fitness key used across all evolution modules
+FITNESS_KEY = "total_fitness"
+
 
 def _fitness_score(c: Chromosome) -> float:
+    """Extract fitness score from chromosome.
+    
+    Args:
+        c: The chromosome to evaluate.
+        
+    Returns:
+        The fitness score, defaulting to 0.0 if not available.
+    """
     f = c.fitness
     if not f:
         return 0.0
-    return f.get("composite", f.get("accuracy", 0.0))
+    return f.get(FITNESS_KEY, f.get("accuracy", 0.0))
 
 
 def tournament_selection(population: list[Chromosome], tournament_size: int = 3) -> Chromosome:

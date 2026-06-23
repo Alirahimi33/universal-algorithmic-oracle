@@ -72,7 +72,7 @@ class PyTarotWrapper(SymbolicSystemWrapper):
                 if isinstance(val, (int, float)):
                     all_values.append(val)
                 elif isinstance(val, str):
-                    h = int(hashlib.md5(val.encode()).hexdigest()[:4], 16)
+                    h = int(hashlib.sha256(val.encode()).hexdigest()[:4], 16)
                     all_values.append(h)
                 elif isinstance(val, dict):
                     for v in val.values():

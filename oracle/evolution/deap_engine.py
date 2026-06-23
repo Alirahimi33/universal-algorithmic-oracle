@@ -13,12 +13,23 @@ from .progressive_difficulty import ProgressiveDifficulty
 from .adaptive_rates import AdaptiveRateController, compute_population_diversity
 
 
-AVAILABLE_SYSTEMS = [
-    ("gematria", "internal"),
-    ("iching", "internal"),
-    ("geomancy", "internal"),
-    ("calendar", "internal"),
-]
+def get_available_systems() -> list[tuple[str, str]]:
+    """Get available symbolic systems from the registry.
+    
+    Returns:
+        List of (system_id, backend) tuples.
+    """
+    try:
+        from ..symbolic.registry import list_systems
+        return [(s, "internal") for s in list_systems()]
+    except Exception:
+        # Fallback to minimal set if registry fails
+        return [
+            ("gematria", "internal"),
+            ("iching", "internal"),
+            ("geomancy", "internal"),
+            ("calendar", "internal"),
+        ]
 
 
 class EvolutionaryEngine:
@@ -48,7 +59,7 @@ class EvolutionaryEngine:
         self.use_adaptive_rates = config.get("use_adaptive_rates", True)
 
     def initialize_population(self, systems: list[tuple[str, str]] | None = None) -> list[Chromosome]:
-        systems = systems or AVAILABLE_SYSTEMS
+        systems = systems or get_available_systems()
         self.population = []
 
         if self.use_progressive_difficulty:
@@ -216,7 +227,7 @@ class EvolutionaryEngine:
             else:
                 seed = entropy_packet.get("seed", 42)
                 sha = entropy_packet.get("sha_stream", "0")
-                hash_val = int(hashlib.md5(f"{sha}_{i}_{seed}".encode()).hexdigest()[:8], 16)
+                hash_val = int(hashlib.sha256(f"{sha}_{i}_{seed}".encode()).hexdigest()[:8], 16)
                 predictions.append((hash_val % 10000) / 10000.0 * self.benchmark.num_range[1])
 
         precision = self.benchmark.get_number_precision()

@@ -48,7 +48,7 @@ class GraphemeWrapper(SymbolicSystemWrapper):
             clusters = list(grapheme.graphemes(text))
             g_len = grapheme.length(text)
 
-            cluster_hashes = [int(hashlib.md5(c.encode()).hexdigest()[:4], 16) for c in clusters]
+            cluster_hashes = [int(hashlib.sha256(c.encode()).hexdigest()[:4], 16) for c in clusters]
 
             hash_val = int(hashlib.sha256(text.encode()).hexdigest()[:8], 16)
 

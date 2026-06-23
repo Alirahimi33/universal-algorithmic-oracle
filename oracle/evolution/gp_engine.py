@@ -6,7 +6,19 @@ from ..genome.tree_genome import TreeGenome, TreeNode
 from ..evaluation.fitness import FitnessEvaluator
 
 
-AVAILABLE_SYSTEMS = ["gematria", "iching", "geomancy", "calendar"]
+def get_available_systems() -> list[str]:
+    """Get available symbolic systems from the registry.
+    
+    Returns:
+        List of system IDs.
+    """
+    try:
+        from ..symbolic.registry import list_systems
+        return list_systems()
+    except Exception:
+        return ["gematria", "iching", "geomancy", "calendar"]
+
+
 FUSION_OPS = ["weighted_sum", "modular_resonance", "xor_fusion"]
 TRANSFORM_OPS = ["normalize", "modular", "invert"]
 
@@ -27,7 +39,7 @@ class GPEngine:
         self.best_history: list[dict] = []
 
     def initialize_population(self, systems: list[str] | None = None) -> list[TreeGenome]:
-        systems = systems or AVAILABLE_SYSTEMS
+        systems = systems or get_available_systems()
         self.population = []
 
         for _ in range(self.population_size):

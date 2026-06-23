@@ -169,7 +169,7 @@ class OraclePipeline:
             entropy_sig = ""
             if hasattr(entropy_packet, 'question_signature') and isinstance(entropy_packet.question_signature, dict):
                 entropy_sig = entropy_packet.question_signature.get("hash_hex", "")
-            graph_hash = hashlib.md5(json.dumps(best.to_dict(), default=str).encode()).hexdigest()[:16] if hasattr(best, 'to_dict') else ""
+            graph_hash = hashlib.sha256(json.dumps(best.to_dict(), default=str).encode()).hexdigest()[:16] if hasattr(best, 'to_dict') else ""
             self.experiment_ledger.register_experiment(
                 question_text=question,
                 entropy_signature=entropy_sig,

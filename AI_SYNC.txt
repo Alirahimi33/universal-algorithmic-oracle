@@ -1,0 +1,541 @@
+# AI_SYNC.txt - Senior Engineer Code Review Directives
+# Reviewer: Senior Industrial Software Engineer
+# Date: 2026-06-23
+# Project: universal_algorithmic_oracle
+# Priority: CRITICAL - All items must be addressed before production deployment
+
+================================================================================
+CRITICAL SECURITY VULNERABILITIES
+================================================================================
+
+1. CRITICAL: FormulaEngine.evaluate() uses eval() with __builtins__ override
+   File: oracle/symbolic/modifiable.py:232
+   Issue: `result = eval(formula, {"__builtins__": {}}, safe_vars)` - This is
+   exploitable. Even with __builtins__ override, sophisticated attacks can
+   bypass this. The safe_eval module exists at oracle/utils/safe_eval.py but
+   is NOT used by FormulaEngine.
+   Directive: REPLACE eval() in FormulaEngine.evaluate() with calls to
+   safe_eval.safe_eval() from oracle/utils/safe_eval.py. The FormulaEngine
+   must NEVER use raw eval(). This is a hard requirement.
+
+2. CRITICAL: html.escape() applied to user questions destroys non-ASCII content
+   File: oracle/sanitizer.py:22
+   Issue: `question = html.escape(question)` destroys Arabic, Hebrew, Persian,
+   and Chinese characters which are the PRIMARY input of this oracle system.
+   html.escape converts non-ASCII entities, breaking gematria calculations,
+   character analysis, and all symbolic processing.
+   Directive: REMOVE html.escape() from sanitize_question(). The sanitizer
+   should only: (a) enforce MAX_QUESTION_LENGTH, (b) strip leading/trailing
+   whitespace, (c) log suspicious patterns. Do NOT escape Unicode characters.
+
+3. CRITICAL: SQLite database connections are never properly managed
+   Files: oracle/memory/archive.py, oracle/memory/chromosome_archive.py,
+   oracle/memory/experiment_ledger.py, oracle/memory/mutation_bank.py
+   Issue: Every method opens a new sqlite3.connect() and commits individually.
+   No connection pooling, no WAL mode, no proper transaction management.
+   Concurrent access will cause database locking.
+   Directive: Implement a singleton database manager class with:
+   - Connection pooling or WAL journal mode
+   - Context manager pattern (with statement) for all DB operations
+   - Proper exception handling with rollback
+   - Thread-safe connection handling
+   Use `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000`
+
+4. CRITICAL: md5 used for content hashing in multiple files
+   Files: oracle/runtime/executor.py:172, oracle/evolution/rule_invention.py,
+   oracle/evolution/mutation.py:326
+   Issue: MD5 is cryptographically broken. For a system that generates
+   "oracle outputs" that may be referenced, this is unacceptable.
+   Directive: Replace ALL md5 usage with hashlib.sha256(). Search all files
+   for `hashlib.md5` and replace with `hashlib.sha256`.
+
+================================================================================
+ERROR HANDLING AND RESILIENCE
+================================================================================
+
+5. HIGH: Bare except clauses silently swallow all errors
+   Files: oracle/symbolic/registry.py:124 (`except Exception: pass`),
+   oracle/evaluation/fitness.py (multiple `except Exception` blocks),
+   oracle/evolution/engines/shared.py:55
+   Issue: Silent error swallowing makes debugging impossible. In production,
+   errors are INFO, not silence.
+   Directive: Replace ALL bare `except Exception: pass` with:
+   ```python
+   except ImportError as e:
+       logger.debug("Optional dependency not available: %s", e)
+   except Exception as e:
+       logger.warning("Module %s failed to load: %s", mod_path, e)
+   ```
+   NEVER use `pass` in except blocks. ALWAYS log the exception.
+
+6. HIGH: OraclePipeline.__init__ silently creates data directory with os.makedirs
+   File: oracle/runtime/executor.py:78
+   Issue: `os.makedirs(os.path.dirname(...), exist_ok=True)` runs inside
+   __init__ which can fail on read-only filesystems or permission issues.
+   Directive: Move directory creation to an explicit `setup()` method or
+   use a lazy initialization pattern. Log the directory creation. Handle
+   OSError properly.
+
+7. HIGH: No timeout protection on chromosome execution
+   File: oracle/genome/chromosome.py:78 (execute method)
+   Issue: chromosome.execute() can hang indefinitely if a symbolic system
+   enters an infinite loop. The ExecutionSandbox exists but is NOT used
+   by the actual execution path.
+   Directive: Integrate ExecutionSandbox into the execution pipeline.
+   All chromosome.execute() calls MUST go through the sandbox with a
+   configurable timeout. The sandbox must kill long-running computations.
+
+8. HIGH: _next_prime() in modifiable.py can infinite loop
+   File: oracle/symbolic/modifiable.py:276-278
+   Issue: `while True: if all(n % i != 0 ...): return n; n += 1` can
+   theoretically run forever for very large n values.
+   Directive: Add a maximum iteration limit (e.g., 10000 iterations).
+   Return the best candidate found if limit is reached.
+
+9. HIGH: FormulaEngine.random_formula() can generate syntactically invalid formulas
+   File: oracle/symbolic/modifiable.py:238-246
+   Issue: Random formula generation can produce expressions like
+   `(fibonacci fibonacci) Fibonacci)` with mismatched parentheses.
+   Directive: Implement proper formula validation after generation.
+   Use ast.parse() to verify the generated formula is valid Python
+   before returning it. Regenerate if invalid (max 3 attempts).
+
+================================================================================
+TYPE SAFETY AND DATA INTEGRITY
+================================================================================
+
+10. HIGH: Inconsistent fitness dict usage across the codebase
+    Files: oracle/evolution/selection.py:11, oracle/evolution/deap_engine.py:95,
+    oracle/evolution/nsga_engine.py:37
+    Issue: selection.py uses `f.get("composite", f.get("accuracy", 0.0))` but
+    deap_engine.py uses `f.get("total_fitness", 0)`. These are different keys!
+    The fitness evaluator produces "total_fitness" but selection looks for
+    "composite" or "accuracy".
+    Directive: UNIFY the fitness key. The canonical key MUST be "total_fitness"
+    everywhere. Update _fitness_score() in selection.py to use "total_fitness".
+    Create a FITNESS_KEY constant and use it across all modules.
+
+11. HIGH: Chromosome.to_dict() serialization doesn't handle all edge cases
+    File: oracle/genome/chromosome.py:276-290
+    Issue: `g.__dict__` for Gene serialization loses type info. The from_dict
+    reconstruction at line 296-298 can fail if the dict structure differs.
+    Directive: Implement proper __json__ or to_dict/from_dict methods on Gene.
+    Never use __dict__ for serialization. Add validation in from_dict to
+    handle missing or malformed data gracefully.
+
+12. HIGH: Topological sort silently returns unsorted list on cycles
+    File: oracle/genome/chromosome.py:148-149
+    Issue: `if len(topo) != len(self.genes): return list(self.genes.keys())`
+    silently returns an arbitrary order when cycles exist. This can cause
+    incorrect execution order.
+    Directive: Log a warning when a cycle is detected. Implement cycle
+    detection and reporting. Consider breaking cycles by removing edges
+    rather than returning arbitrary order.
+
+13. MEDIUM: Type annotations are inconsistent
+    File: oracle/runtime/executor.py:72
+    Issue: `config: dict | None = None` uses Python 3.10+ union syntax but
+    the project declares requires-python >= 3.11 in pyproject.toml. This is
+    acceptable but should be consistent - some files use Optional[] and some
+    use dict | None.
+    Directive: Standardize ALL type annotations to use Python 3.10+ syntax
+    (X | None instead of Optional[X]) for consistency. Update all files.
+
+================================================================================
+PERFORMANCE AND RESOURCE MANAGEMENT
+================================================================================
+
+14. HIGH: Repeated sqlite3.connect() calls create connection overhead
+    Files: oracle/memory/archive.py (every method), oracle/memory/chromosome_archive.py
+    Issue: Each method call opens a new SQLite connection. This is O(n)
+    connection overhead per operation.
+    Directive: Implement a connection pool or use a single persistent
+    connection with proper thread safety. Use contextmanager pattern:
+    ```python
+    @contextmanager
+    def _get_connection(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        try:
+            yield conn
+        finally:
+            conn.close()
+    ```
+
+15. MEDIUM: No connection cleanup on exceptions in SQLAlchemy backend
+    File: oracle/storage/sqlalchemy_backend.py:99-100
+    Issue: `_session()` creates sessions that may not be closed on exception.
+    Directive: Use `contextmanager` for all session operations:
+    ```python
+    @contextmanager
+    def _session(self):
+        session = self.SessionFactory()
+        try:
+            yield session
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+    ```
+
+16. MEDIUM: EvolutionaryEngine evolves entire population synchronously
+    File: oracle/evolution/deap_engine.py:84-194
+    Issue: The main evolve() loop evaluates all chromosomes sequentially.
+    With 50+ chromosomes and complex symbolic systems, this is extremely slow.
+    Directive: Integrate ParallelEvaluator (already exists at
+    oracle/evolution/parallel_evaluator.py) into the main evolve loop.
+    Replace the sequential evaluation loop with parallel evaluation.
+
+17. MEDIUM: Memory leak in GenerationalMemory.successful_patterns
+    File: oracle/memory/generational_memory.py:21
+    Issue: `successful_patterns: list[dict] = []` grows unboundedly.
+    Directive: Add a max size (e.g., 1000) and implement a FIFO eviction
+    policy: `if len(self.successful_patterns) > MAX_PATTERNS:
+    self.successful_patterns = self.successful_patterns[-MAX_PATTERNS:]`
+
+================================================================================
+ARCHITECTURAL AND DESIGN ISSUES
+================================================================================
+
+18. HIGH: Duplicate FullPipeline and OraclePipeline implementations
+    Files: oracle/runtime/pipeline.py and oracle/runtime/executor.py
+    Issue: FullPipeline and OraclePipeline are near-identical implementations.
+    FullPipeline is 116 lines of mostly duplicated code from OraclePipeline.
+    Directive: DELETE FullPipeline entirely. It is redundant. If needed,
+    create a thin wrapper or adapter that delegates to OraclePipeline.
+    Remove pipeline.py from __init__.py exports.
+
+19. HIGH: AVAILABLE_SYSTEMS is hardcoded in multiple places
+    Files: oracle/evolution/deap_engine.py:16-21, oracle/evolution/gp_engine.py:9
+    Issue: Available systems are hardcoded as [("gematria", "internal"), ...]
+    instead of being derived from the actual registry.
+    Directive: Replace hardcoded AVAILABLE_SYSTEMS with calls to
+    `list_systems()` from the registry. Create a factory function:
+    ```python
+    def get_available_systems():
+        return [(s, "internal") for s in list_systems()]
+    ```
+
+20. HIGH: Evolution engines don't share state properly
+    Issue: OraclePipeline creates separate EvolutionaryEngine, GPEngine, and
+    NSGAEngine instances that each maintain independent populations. There is
+    no cross-pollination of genetic material between engines.
+    Directive: Implement a shared population pool or migration mechanism
+    between engines. The best individuals from GA should seed the GP
+    population and vice versa. At minimum, share the memory/archive.
+
+21. MEDIUM: Island model ISLAND_FAMILIES is incomplete
+    File: oracle/evolution/islands/island_model.py:10-16
+    Issue: Only 5 families defined, but there are 100+ symbolic systems.
+    Most systems are never used in island model evolution.
+    Directive: Dynamically generate island families from the registry.
+    Group systems by category (astrology, divination, calendar, etc.)
+    using the system metadata.
+
+22. MEDIUM: NSGA-II implementation is custom, not using pymoo
+    File: oracle/evolution/nsga_engine.py
+    Issue: NSGA-II is implemented from scratch despite pymoo being listed
+    as a dependency. Custom implementations are error-prone and slower.
+    Directive: Either properly integrate pymoo's NSGA-II or remove pymoo
+    from dependencies. If keeping custom implementation, add comprehensive
+    tests to validate correctness.
+
+23. MEDIUM: No input validation on many public APIs
+    Files: oracle/runtime/executor.py:ask(), oracle/evolution/deap_engine.py:evolve()
+    Issue: ask() accepts arbitrary strings for engine name, doesn't validate
+    generations > 0, doesn't validate timestamp ranges.
+    Directive: Add pydantic models or explicit validation for all public
+    method parameters. Validate engine is in available engines list.
+    Validate generations > 0 and < MAX_GENERATIONS.
+
+================================================================================
+TESTING AND QUALITY ASSURANCE
+================================================================================
+
+24. HIGH: No unit tests for FormulaEngine.evaluate() security
+    File: oracle/symbolic/modifiable.py
+    Issue: FormulaEngine uses eval() but there are no tests verifying that
+    malicious formulas are properly blocked.
+    Directive: Add comprehensive security tests:
+    - Test that import os.system is blocked
+    - Test that __import__ is blocked
+    - Test that open() is blocked
+    - Test that subprocess calls are blocked
+    - Test that file reads are blocked
+
+25. MEDIUM: Test files exist but coverage is unclear
+    Files: tests/test_all.py, tests/test_integration.py
+    Issue: No coverage reporting configured. Cannot verify which modules
+    are tested and which are not.
+    Directive: Add pytest-cov configuration. Ensure minimum 70% coverage
+    for core modules (runtime, genome, evolution, evaluation). Add
+    coverage reporting to CI.
+
+26. MEDIUM: No tests for edge cases in chromosome execution
+    Issue: Empty chromosomes, chromosomes with cycles, chromosomes with
+    missing system IDs are not tested.
+    Directive: Add test cases for:
+    - Chromosome with 0 genes
+    - Chromosome with circular edges
+    - Chromosome referencing non-existent system
+    - Chromosome with malformed parameters
+
+================================================================================
+DEPENDENCY AND BUILD ISSUES
+================================================================================
+
+27. HIGH: requirements.txt and pyproject.toml dependency versions conflict
+    Issue: requirements.txt lists numpy>=2.0, scipy>=1.12, pandas>=2.0
+    but pyproject.toml only lists numpy>=1.24 and PyYAML>=6.0 as core
+    dependencies. The optional dependency groups have version conflicts.
+    Directive: Reconcile all version requirements. Ensure pyproject.toml
+    is the single source of truth. Update requirements.txt to match.
+    Pin exact versions for reproducible builds.
+
+28. HIGH: Many wrapper modules will fail to import without their dependencies
+    File: oracle/symbolic/registry.py:121-125
+    Issue: register_all() silently skips all modules that fail to import.
+    This means many symbolic systems are silently unavailable.
+    Directive: Add a startup diagnostics mode that reports which systems
+    are available and which are missing dependencies. Log at WARNING level
+    which systems are unavailable. Provide a `--check-deps` CLI command.
+
+29. MEDIUM: No dependency pinning for reproducible builds
+    Issue: All dependencies use >= version ranges. A new version release
+    can break the system without warning.
+    Directive: Add a requirements-lock.txt or use pip-tools to generate
+    locked dependency versions. This ensures reproducible deployments.
+
+30. LOW: __pycache__ directories are not in .gitignore
+    File: .gitignore (missing __pycache__)
+    Issue: Compiled Python files are committed to the repository.
+    Directive: Add to .gitignore:
+    ```
+    __pycache__/
+    *.pyc
+    *.pyo
+    .pytest_cache/
+    *.db
+    data/
+    ```
+
+================================================================================
+CODE QUALITY AND MAINTAINABILITY
+================================================================================
+
+31. HIGH: Magic numbers throughout the codebase
+    Files: oracle/evaluation/fitness.py:140, oracle/genome/chromosome.py:208,
+    oracle/evolution/deap_engine.py:137-139
+    Issue: Hardcoded constants like 0.3, 0.4, 0.2, 0.5, 0.6, 0.7 appear
+    everywhere without explanation.
+    Directive: Extract all magic numbers into named constants with clear
+    documentation. Example:
+    ```python
+    # Fitness dimension weights
+    STRUCTURAL_WEIGHT = 0.15
+    STABILITY_WEIGHT = 0.15
+    CONVERGENCE_WEIGHT = 0.10
+    ```
+
+32. HIGH: Duplicate code in entropy packet dict construction
+    Files: oracle/runtime/pipeline.py:31-42 and 76-87
+    Issue: The same 11-line dict construction block is duplicated.
+    Directive: Already fixed in executor.py with _packet_to_dict().
+    Remove the duplicate blocks from pipeline.py (which should be deleted
+    per issue #18).
+
+33. MEDIUM: No logging configuration hierarchy
+    File: oracle/logging_config.py
+    Issue: setup_logging() creates a root oracle logger but child loggers
+    don't inherit proper configuration.
+    Directive: Ensure all modules use `logging.getLogger(__name__)` and
+    the root oracle logger propagates to console. Add file handler option
+    for production logging.
+
+34. MEDIUM: Comment style is inconsistent
+    Files: Multiple
+    Issue: Some files have module docstrings, some don't. Some have
+    function docstrings, some don't. No consistent format.
+    Directive: Add Google-style docstrings to ALL public classes and methods.
+    Module docstrings must exist in all .py files. Use type hints everywhere.
+
+35. MEDIUM: No __all__ exports defined in most modules
+    Files: Most modules except oracle/__init__.py and oracle/runtime/__init__.py
+    Issue: Without __all__, `from module import *` imports everything.
+    Directive: Define __all__ in every __init__.py and in every module
+    that defines public APIs.
+
+36. LOW: Inconsistent naming conventions
+    Files: Multiple
+    Issue: Mix of snake_case and camelCase in some places. Variable names
+    like `ep_dict`, `nv`, `t` are too short.
+    Directive: Follow PEP 8 strictly. All functions and variables must be
+    snake_case. Class names must be PascalCase. Use descriptive names.
+
+================================================================================
+CONFIGURATION AND DEPLOYMENT
+================================================================================
+
+37. HIGH: Config files are not loaded from standard locations
+    File: oracle/runtime/executor.py
+    Issue: OraclePipeline reads config from memory_path but doesn't load
+    from config/settings.yaml, config/systems.yaml, or config/evolution.yaml.
+    The config directory exists but is never used by the pipeline.
+    Directive: Load configuration from YAML files in config/ directory.
+    Implement config merging: defaults < YAML < environment < CLI args.
+
+38. MEDIUM: No environment variable support for configuration
+    Issue: No way to override settings via environment variables for
+    containerized deployments.
+    Directive: Support environment variables like:
+    - ORACLE_MEMORY_PATH
+    - ORACLE_LOG_LEVEL
+    - ORACLE_POPULATION_SIZE
+    Use os.environ.get() with sensible defaults.
+
+39. MEDIUM: No Docker/containerization support
+    Issue: No Dockerfile or docker-compose.yml exists.
+    Directive: Create a Dockerfile with:
+    - Multi-stage build
+    - Non-root user
+    - Health check endpoint
+    - Proper signal handling
+
+40. LOW: No CI/CD pipeline configuration
+    Issue: No GitHub Actions or CI configuration exists.
+    Directive: Create .github/workflows/ci.yml with:
+    - Lint (ruff)
+    - Type check (mypy)
+    - Test (pytest with coverage)
+    - Build verification
+
+================================================================================
+SPECIFIC FILE-LEVEL FIXES REQUIRED
+================================================================================
+
+FIX #1: oracle/symbolic/modifiable.py
+- Line 232: Replace `eval(formula, {"__builtins__": {}}, safe_vars)` with
+  `safe_eval.safe_eval(formula, variables=safe_vars)` from oracle.utils.safe_eval
+- Line 276-278: Add max iteration limit to _next_prime()
+- Line 238-246: Add formula validation after random generation
+
+FIX #2: oracle/sanitizer.py
+- Line 22: REMOVE `question = html.escape(question)` entirely
+- Add logging for sanitization actions
+
+FIX #3: oracle/memory/archive.py
+- Wrap all methods with context manager pattern
+- Add WAL mode pragma
+- Add proper error handling with rollback
+
+FIX #4: oracle/memory/chromosome_archive.py
+- Same fixes as archive.py
+- Add connection pooling
+
+FIX #5: oracle/runtime/executor.py
+- Line 172: Replace md5 with sha256
+- Remove FullPipeline reference from __init__.py
+
+FIX #6: oracle/evolution/selection.py
+- Line 11: Change to use "total_fitness" key consistently
+
+FIX #7: oracle/evolution/deap_engine.py
+- Remove hardcoded AVAILABLE_SYSTEMS
+- Use list_systems() from registry
+- Integrate ParallelEvaluator
+
+FIX #8: oracle/evolution/gp_engine.py
+- Remove hardcoded AVAILABLE_SYSTEMS
+- Use list_systems() from registry
+
+FIX #9: oracle/genome/chromosome.py
+- Line 148-149: Add warning log when cycle detected
+- Line 158: Add type checking for entropy_packet parameter
+
+FIX #10: oracle/evaluation/fitness.py
+- All bare except blocks: Add proper logging
+
+FIX #11: oracle/evaluation/pure_entropy_test.py
+- Line 151: Move `import math` to top of file (PEP 8)
+
+FIX #12: oracle/evaluation/historical_blind_test.py
+- Line 217: prediction defaults to 0 without reason - document the logic
+
+FIX #13: oracle/symbolic/registry.py
+- Line 124: Log which modules fail and why
+- Add startup diagnostics
+
+FIX #14: oracle/storage/sqlalchemy_backend.py
+- Add session context manager
+- Add proper rollback handling
+
+FIX #15: oracle/interface/web_api.py
+- Line 71,130: Replace deprecated @app.on_event("startup") with
+  lifespan handlers (FastAPI best practice)
+- Add rate limiting
+- Add authentication for /ask endpoint
+
+FIX #16: oracle/output/oracle_output.py
+- Line 273-276: has_feedback check is O(n^2) - optimize with set lookup
+
+FIX #17: oracle/evolution/rule_invention.py
+- Line 93, 109, 127, 145, 166: Replace md5 with sha256
+
+FIX #18: oracle/genome/chromosome.py
+- Line 326: Replace md5 with sha256
+
+FIX #19: oracle/runtime/cache.py
+- Line 17: Replace md5 with sha256 for cache keys
+
+FIX #20: oracle/evaluation/benchmark.py
+- Line 214: Replace md5 with sha256
+
+================================================================================
+IMPLEMENTATION PRIORITY ORDER
+================================================================================
+
+Phase 1 (CRITICAL - Do First):
+1. Fix #1: Replace eval() with safe_eval
+2. Fix #2: Remove html.escape()
+3. Fix #4: All md5 -> sha256 replacements
+4. Fix #5: Fix SQLite connection management
+5. Fix #10: Fix fitness key consistency
+
+Phase 2 (HIGH - Do Second):
+6. Fix #6: Fix error handling across all modules
+7. Fix #7: Remove hardcoded AVAILABLE_SYSTEMS
+8. Fix #8: Add timeout protection for chromosome execution
+9. Fix #18: Delete duplicate FullPipeline
+10. Fix #23: Add input validation
+
+Phase 3 (MEDIUM - Do Third):
+11. Fix #14: Performance optimizations
+12. Fix #31: Extract magic numbers
+13. Fix #33: Add comprehensive logging
+14. Fix #37: Load config from YAML files
+15. Fix #25: Add test coverage
+
+Phase 4 (LOW - Do Last):
+16. Fix #30: Update .gitignore
+17. Fix #34-36: Code style improvements
+18. Fix #39-40: CI/CD and containerization
+
+================================================================================
+VERIFICATION REQUIREMENTS
+================================================================================
+
+After implementing all fixes, verify:
+1. `python -c "from oracle import OraclePipeline; p = OraclePipeline()"` works
+2. `python -m pytest tests/ -v --tb=short` passes all tests
+3. No `eval(` calls exist except in safe_eval.py
+4. No `html.escape` in sanitizer.py
+5. No `hashlib.md5` anywhere in the codebase
+6. `grep -r "except Exception: pass" oracle/` returns zero results
+7. `grep -r "AVAILABLE_SYSTEMS = " oracle/` shows only registry-based versions
+8. All public methods have docstrings
+9. All __init__.py files have __all__ defined
+
+================================================================================
+END OF AI_SYNC DIRECTIVES
+================================================================================

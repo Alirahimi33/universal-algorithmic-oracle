@@ -14,7 +14,7 @@ class OracleCache:
 
     def _make_key(self, chromosome_id: str, entropy_packet: dict) -> str:
         ep_str = json.dumps(entropy_packet, sort_keys=True, default=str)
-        return f"{chromosome_id}:{hashlib.md5(ep_str.encode()).hexdigest()}"
+        return f"{chromosome_id}:{hashlib.sha256(ep_str.encode()).hexdigest()}"
 
     def get(self, chromosome_id: str, entropy_packet: dict) -> dict | None:
         key = self._make_key(chromosome_id, entropy_packet)

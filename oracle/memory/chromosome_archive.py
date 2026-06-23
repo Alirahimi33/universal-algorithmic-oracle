@@ -54,7 +54,7 @@ class ChromosomeArchive:
         """Save a chromosome if it's better than existing ones."""
         score = chromosome.fitness.get("total_fitness", 0) if isinstance(chromosome.fitness, dict) else 0
         pred_acc = chromosome.fitness.get("prediction_accuracy", 0) if isinstance(chromosome.fitness, dict) else 0
-        chrom_id = getattr(chromosome, 'chromosome_id', None) or hashlib.md5(f"{time.time()}".encode()).hexdigest()[:8]
+        chrom_id = getattr(chromosome, 'chromosome_id', None) or hashlib.sha256(f"{time.time()}".encode()).hexdigest()[:8]
 
         existing = self.get_best(n=1)
         if existing and score <= existing[0].get("fitness_score", 0):

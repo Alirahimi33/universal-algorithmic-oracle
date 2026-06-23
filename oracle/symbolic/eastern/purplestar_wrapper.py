@@ -67,10 +67,10 @@ class PurpleStarWrapper(SymbolicSystemWrapper):
 
             all_values = []
             for i, name in enumerate(palace_names):
-                h = int(hashlib.md5(name.encode()).hexdigest()[:4], 16)
+                h = int(hashlib.sha256(name.encode()).hexdigest()[:4], 16)
                 all_values.append(h)
             for i, code in enumerate(star_codes):
-                h = int(hashlib.md5(code.encode()).hexdigest()[:4], 16)
+                h = int(hashlib.sha256(code.encode()).hexdigest()[:4], 16)
                 all_values.append(h)
 
             numeric_projection = []

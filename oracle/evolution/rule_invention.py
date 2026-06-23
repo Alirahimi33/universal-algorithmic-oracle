@@ -90,7 +90,7 @@ class RuleInventionEngine:
         action = self._mutate_action(template["action"])
         params = self._mutate_params(template["params"])
         return {
-            "rule_id": hashlib.md5(f"rule_{random.random()}".encode()).hexdigest()[:8],
+            "rule_id": hashlib.sha256(f"rule_{random.random()}".encode()).hexdigest()[:8],
             "type": "invented",
             "condition": condition,
             "action": action,
@@ -106,7 +106,7 @@ class RuleInventionEngine:
         input_vars = random.sample(["x", "y", "z", "t", "n", "h", "s", "e"],
                                    random.randint(1, 4))
         return {
-            "rule_id": hashlib.md5(f"formula_{random.random()}".encode()).hexdigest()[:8],
+            "rule_id": hashlib.sha256(f"formula_{random.random()}".encode()).hexdigest()[:8],
             "type": "formula",
             "condition": "always",
             "action": "apply_formula",
@@ -124,7 +124,7 @@ class RuleInventionEngine:
     def _invent_method(self, chromosome: Chromosome) -> dict:
         method = random.choice(self.CALCULATION_METHODS)
         return {
-            "rule_id": hashlib.md5(f"method_{random.random()}".encode()).hexdigest()[:8],
+            "rule_id": hashlib.sha256(f"method_{random.random()}".encode()).hexdigest()[:8],
             "type": "method",
             "condition": "diversity_moderate",
             "action": "use_method",
@@ -142,7 +142,7 @@ class RuleInventionEngine:
     def _invent_strategy(self, chromosome: Chromosome) -> dict:
         strategy = random.choice(self.COMBINATION_STRATEGIES)
         return {
-            "rule_id": hashlib.md5(f"strategy_{random.random()}".encode()).hexdigest()[:8],
+            "rule_id": hashlib.sha256(f"strategy_{random.random()}".encode()).hexdigest()[:8],
             "type": "strategy",
             "condition": "always",
             "action": "combine_systems",
@@ -163,7 +163,7 @@ class RuleInventionEngine:
                 self._invent_method(chromosome)]
         selected = random.sample(rules, min(2, len(rules)))
         return {
-            "rule_id": hashlib.md5(f"hybrid_{random.random()}".encode()).hexdigest()[:8],
+            "rule_id": hashlib.sha256(f"hybrid_{random.random()}".encode()).hexdigest()[:8],
             "type": "hybrid",
             "condition": "always",
             "action": "apply_hybrid",

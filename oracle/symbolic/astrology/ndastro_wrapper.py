@@ -55,13 +55,13 @@ class NdastroWrapper(SymbolicSystemWrapper):
         try:
             import hashlib
             seed = entropy_packet.get("seed", 42) if isinstance(entropy_packet, dict) else 42
-            hash_val = int(hashlib.md5(str(seed).encode()).hexdigest()[:8], 16)
+            hash_val = int(hashlib.sha256(str(seed).encode()).hexdigest()[:8], 16)
 
             planets = {}
             numeric = []
             planet_names = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"]
             for name in planet_names:
-                h = int(hashlib.md5(f"{seed}_{name}".encode()).hexdigest()[:8], 16)
+                h = int(hashlib.sha256(f"{seed}_{name}".encode()).hexdigest()[:8], 16)
                 lon = h % 3600 / 10.0
                 sign_idx = int(lon / 30) % 12
                 degree = lon % 30

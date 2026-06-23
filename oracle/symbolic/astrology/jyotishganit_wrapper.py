@@ -40,7 +40,7 @@ class JyotishGanitWrapper(SymbolicSystemWrapper):
         try:
             import hashlib
             seed = entropy_packet.get("seed", 42) if isinstance(entropy_packet, dict) else 42
-            hash_val = int(hashlib.md5(str(seed).encode()).hexdigest()[:8], 16)
+            hash_val = int(hashlib.sha256(str(seed).encode()).hexdigest()[:8], 16)
 
             year = 1970 + (hash_val % 55)
             month = 1 + (hash_val % 12)
@@ -59,7 +59,7 @@ class JyotishGanitWrapper(SymbolicSystemWrapper):
             planets = {}
             numeric = []
             for name in ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"]:
-                h = int(hashlib.md5(f"{seed}_{name}".encode()).hexdigest()[:8], 16)
+                h = int(hashlib.sha256(f"{seed}_{name}".encode()).hexdigest()[:8], 16)
                 lon_val = h % 3600 / 10.0
                 sign_idx = int(lon_val / 30) % 12
                 planets[name] = {

@@ -50,7 +50,7 @@ class LibephemerisWrapper(SymbolicSystemWrapper):
         try:
             import hashlib
             seed = entropy_packet.get("seed", 42) if isinstance(entropy_packet, dict) else 42
-            hash_val = int(hashlib.md5(str(seed).encode()).hexdigest()[:8], 16)
+            hash_val = int(hashlib.sha256(str(seed).encode()).hexdigest()[:8], 16)
 
             jd = 2451545.0 + (hash_val % 40000)
 

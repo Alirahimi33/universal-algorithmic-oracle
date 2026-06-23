@@ -39,7 +39,7 @@ class LunarMCPWrapper(SymbolicSystemWrapper):
             import hashlib
             from datetime import date
             seed = entropy_packet.get("seed", 42) if isinstance(entropy_packet, dict) else 42
-            hash_val = int(hashlib.md5(str(seed).encode()).hexdigest()[:8], 16)
+            hash_val = int(hashlib.sha256(str(seed).encode()).hexdigest()[:8], 16)
 
             year = 1970 + (hash_val % 55)
             month = 1 + (hash_val % 12)

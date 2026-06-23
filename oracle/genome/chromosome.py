@@ -323,7 +323,7 @@ class Chromosome:
     def crossover(self, other: "Chromosome") -> "Chromosome":
         from ..evolution.crossover import uniform_crossover
         child1, child2 = uniform_crossover(self, other, rate=0.5)
-        child1.chromosome_id = hashlib.md5(f"cross_{random.random()}".encode()).hexdigest()[:8]
+        child1.chromosome_id = hashlib.sha256(f"cross_{random.random()}".encode()).hexdigest()[:8]
         return child1
 
     def mutate(self, rate: float = 0.1) -> "Chromosome":
@@ -345,7 +345,7 @@ class Chromosome:
         prev_id = None
         for i, (sys_id, backend) in enumerate(systems):
             gene = Gene(
-                gene_id=hashlib.md5(f"{sys_id}_{i}_{random.random()}".encode()).hexdigest()[:8],
+                gene_id=hashlib.sha256(f"{sys_id}_{i}_{random.random()}".encode()).hexdigest()[:8],
                 system_id=sys_id,
                 backend=backend,
                 params={},
@@ -360,7 +360,7 @@ class Chromosome:
             prev_id = gene.gene_id
 
         return cls(
-            chromosome_id=hashlib.md5(f"chr_{random.random()}".encode()).hexdigest()[:8],
+            chromosome_id=hashlib.sha256(f"chr_{random.random()}".encode()).hexdigest()[:8],
             genes=genes,
             edges=edges,
             fusion_schema={"type": "weighted_average"},

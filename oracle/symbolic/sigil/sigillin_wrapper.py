@@ -48,7 +48,7 @@ class SigillinWrapper(SymbolicSystemWrapper):
                 "seed": seed,
                 "entropy_hash": entropy_packet.get("sha_stream", str(seed))[:64],
                 "timestamp": entropy_packet.get("timestamp", 0),
-                "question_hash": hashlib.md5(str(entropy_packet.get("question", "")).encode()).hexdigest(),
+                "question_hash": hashlib.sha256(str(entropy_packet.get("question", "")).encode()).hexdigest(),
             }
 
             tmp_dir = tempfile.mkdtemp()

@@ -56,7 +56,7 @@ class HybridGenome:
         tree_children = []
         for i, sys_id in enumerate(systems):
             gene = Gene(
-                gene_id=hashlib.md5(f"hybrid_{sys_id}_{i}_{random.random()}".encode()).hexdigest()[:8],
+                gene_id=hashlib.sha256(f"hybrid_{sys_id}_{i}_{random.random()}".encode()).hexdigest()[:8],
                 system_id=sys_id, backend="internal", gene_type="symbolic_system",
                 params={}, input_slots=[f"in_{i}"], output_slots=[f"out_{i}"],
                 weight=random.uniform(0.1, 1.0),
@@ -76,7 +76,7 @@ class HybridGenome:
                  for i in range(len(linear_genes)-1)]
 
         return cls(
-            genome_id=hashlib.md5(f"hybrid_{random.random()}".encode()).hexdigest()[:8],
+            genome_id=hashlib.sha256(f"hybrid_{random.random()}".encode()).hexdigest()[:8],
             linear_part=linear_genes,
             tree_root=tree_root,
             graph_edges=edges,

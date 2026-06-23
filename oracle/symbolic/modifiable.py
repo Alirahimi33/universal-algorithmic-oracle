@@ -225,11 +225,21 @@ class FormulaEngine:
 
     @staticmethod
     def evaluate(formula: str, variables: dict) -> float:
+        """Evaluate a formula string with given variables using safe evaluation.
+        
+        Args:
+            formula: The mathematical expression to evaluate.
+            variables: Dictionary of variable names and values.
+            
+        Returns:
+            The result as a float, or 0.0 on error.
+        """
         try:
-            safe_vars = {"math": math, "random": random}
+            from oracle.utils.safe_eval import safe_eval
+            safe_vars = {}
             safe_vars.update(variables)
             safe_vars.update(FormulaEngine.FUNCTIONS)
-            result = eval(formula, {"__builtins__": {}}, safe_vars)
+            result = safe_eval(formula, safe_vars, FormulaEngine.FUNCTIONS)
             return float(result)
         except Exception:
             return 0.0
@@ -270,9 +280,21 @@ def _fib(n: int) -> int:
     return a
 
 
-def _next_prime(n: int) -> int:
+def _next_prime(n: int, max_iterations: int = 10000) -> int:
+    """Find the next prime number after n.
+    
+    Args:
+        n: Starting number.
+        max_iterations: Maximum iterations to prevent infinite loop.
+        
+    Returns:
+        The next prime number, or n if max_iterations reached.
+    """
     n = max(2, int(n))
-    while True:
+    iterations = 0
+    while iterations < max_iterations:
         if all(n % i != 0 for i in range(2, int(math.sqrt(n)) + 1)):
             return n
         n += 1
+        iterations += 1
+    return n

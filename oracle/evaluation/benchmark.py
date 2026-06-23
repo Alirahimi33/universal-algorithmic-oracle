@@ -211,7 +211,7 @@ class PredictionBenchmark:
             else:
                 base = (seed_val * (i + 1) * 31) % 10000
 
-            hash_val = int(hashlib.md5(f"{sha}_{i}_{seed_val}".encode()).hexdigest()[:8], 16)
+            hash_val = int(hashlib.sha256(f"{sha}_{i}_{seed_val}".encode()).hexdigest()[:8], 16)
             combined = (base * 0.3 + (hash_val % 10000) * 0.7) / 10000.0
             predictions.append(combined * self.num_range[1])
 
