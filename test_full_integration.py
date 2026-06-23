@@ -252,13 +252,13 @@ def test_storage_backends():
                 "question_text": "Real integration test",
                 "oracle_id": "orcl_test",
                 "oracle_version": "v1",
-                "oracle_graph_hash": hashlib.md5(b"test").hexdigest(),
+                "oracle_graph_hash": hashlib.sha256(b"test").hexdigest(),
                 "prediction_payload": json.dumps({"answer": "test"}),
-                "prediction_hash": hashlib.md5(b"pred").hexdigest(),
+                "prediction_hash": hashlib.sha256(b"pred").hexdigest(),
                 "timestamp_created": _time.time(),
                 "time_horizon": "1d",
                 "domain": "test",
-                "content_hash": hashlib.md5(b"content").hexdigest(),
+                "content_hash": hashlib.sha256(b"content").hexdigest(),
             })
 
             # Retrieve
@@ -281,7 +281,7 @@ def test_storage_backends():
                 "generation": 1,
                 "fitness_score": 0.85,
                 "chromosome_data": json.dumps({"genes": [0.1, 0.2]}),
-                "chromosome_hash": hashlib.md5(b"chr").hexdigest(),
+                "chromosome_hash": hashlib.sha256(b"chr").hexdigest(),
                 "timestamp": _time.time(),
             })
             chr_data = db.get_chromosome("chr_test")

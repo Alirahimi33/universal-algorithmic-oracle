@@ -1,6 +1,5 @@
 """Input sanitization for user-provided data."""
 import re
-import html
 import logging
 
 logger = logging.getLogger("oracle.sanitizer")
@@ -18,8 +17,6 @@ def sanitize_question(question: str) -> str:
     if len(question) > MAX_QUESTION_LENGTH:
         logger.warning("Question truncated from %d to %d chars", len(question), MAX_QUESTION_LENGTH)
         question = question[:MAX_QUESTION_LENGTH]
-    
-    question = html.escape(question)
     
     return question
 

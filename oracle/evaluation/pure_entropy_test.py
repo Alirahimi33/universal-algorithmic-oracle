@@ -1,4 +1,5 @@
 """Pure Entropy Test (f1) - mathematical entropy prediction challenge per design doc section 16.2."""
+import math
 import secrets
 import numpy as np
 import hashlib
@@ -146,6 +147,3 @@ def default_oracle_predict(
         predictions.append(row)
     
     return predictions
-
-
-import math

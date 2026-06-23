@@ -246,14 +246,35 @@ class FormulaEngine:
 
     @staticmethod
     def random_formula(depth: int = 2) -> str:
+        """Generate a random valid formula.
+        
+        Args:
+            depth: Recursion depth for formula complexity.
+            
+        Returns:
+            A syntactically valid formula string.
+        """
+        import ast
+        for _ in range(3):  # max 3 attempts
+            formula = FormulaEngine._generate_random(depth)
+            try:
+                ast.parse(formula, mode='eval')
+                return formula
+            except SyntaxError:
+                continue
+        return "0.0"  # fallback safe formula
+
+    @staticmethod
+    def _generate_random(depth: int) -> str:
+        """Internal method to generate random formula string."""
         if depth <= 0:
             return str(random.uniform(-10, 10))
         op = random.choice(list(FormulaEngine.OPERATORS.keys()))
         if random.random() < 0.5:
-            return f"({FormulaEngine.random_formula(depth-1)} {op} {FormulaEngine.random_formula(depth-1)})"
+            return f"({FormulaEngine._generate_random(depth-1)} {op} {FormulaEngine._generate_random(depth-1)})"
         else:
             func = random.choice(list(FormulaEngine.FUNCTIONS.keys()))
-            return f"{func}({FormulaEngine.random_formula(depth-1)})"
+            return f"{func}({FormulaEngine._generate_random(depth-1)})"
 
     @staticmethod
     def mutate_formula(formula: str, rate: float = 0.2) -> str:

@@ -114,6 +114,31 @@ class OraclePipeline:
         generations: int = 50,
         engine: str = "ga",
     ) -> OracleOutput:
+        """Submit a question and receive an oracle reading.
+        
+        Args:
+            question: The question to ask the oracle.
+            timestamp: Optional timestamp override.
+            location: Optional location data.
+            extra_numbers: Optional extra numbers for entropy.
+            generations: Number of evolutionary generations (1-1000).
+            engine: Evolution engine to use.
+            
+        Returns:
+            OracleOutput with the prediction results.
+            
+        Raises:
+            ValueError: If inputs are invalid.
+        """
+        VALID_ENGINES = {"ga", "gp", "nsga", "stochopy", "psopy", "evogine", "cma", "bayesian"}
+        
+        if not question or not isinstance(question, str):
+            raise ValueError("Question must be a non-empty string")
+        if engine not in VALID_ENGINES:
+            raise ValueError(f"Unknown engine '{engine}'. Available: {sorted(VALID_ENGINES)}")
+        if generations < 1 or generations > 1000:
+            raise ValueError("Generations must be between 1 and 1000")
+        
         from ..sanitizer import sanitize_question, sanitize_seed
         question = sanitize_question(question)
         if timestamp is not None:
@@ -146,7 +171,15 @@ class OraclePipeline:
                 disclaimer=OracleOutputBuilder.DISCLAIMER,
             )
 
-        execution_result = best.execute(ep_dict)
+        from .sandbox import ExecutionSandbox
+        sandbox = ExecutionSandbox(timeout=30.0)
+        sandbox_result = sandbox.execute(best, ep_dict)
+        if not sandbox_result["success"]:
+            return OracleOutput(
+                answer=f"Execution failed: {sandbox_result.get('error', 'unknown')}",
+                disclaimer=OracleOutputBuilder.DISCLAIMER,
+            )
+        execution_result = sandbox_result["result"]
 
         self._safe_save_chromosome(best)
         output = self.output_builder.build(best, execution_result, ep_dict)

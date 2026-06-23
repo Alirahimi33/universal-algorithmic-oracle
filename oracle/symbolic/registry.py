@@ -121,8 +121,10 @@ def register_all():
     for mod_path in modules:
         try:
             importlib.import_module(mod_path, package='oracle.symbolic')
-        except Exception:
-            pass  # Skip modules that fail to import
+        except ImportError as e:
+            logger.debug("Optional dependency not available for %s: %s", mod_path, e)
+        except Exception as e:
+            logger.warning("Failed to load module %s: %s", mod_path, e)
     
     _registered_all = True
 

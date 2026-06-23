@@ -2,14 +2,29 @@
 import sqlite3
 import json
 import time
+from contextlib import contextmanager
 
 class EvolutionaryMemory:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._init_db()
 
+    @contextmanager
+    def _connect(self):
+        """Context manager for database connections with WAL mode."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS memories (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +40,7 @@ class EvolutionaryMemory:
 
     def store(self, chromosome_id: str, generation: int, fitness_score: float, 
               chromosome_data: dict = None, metadata: dict = None):
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 "INSERT INTO memories (chromosome_id, generation, fitness_score, chromosome_data, timestamp, metadata) VALUES (?, ?, ?, ?, ?, ?)",
                 (chromosome_id, generation, fitness_score, json.dumps(chromosome_data or {}), 
@@ -34,7 +49,7 @@ class EvolutionaryMemory:
             conn.commit()
 
     def retrieve_best(self, n: int = 10) -> list[dict]:
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute(
                 "SELECT chromosome_id, generation, fitness_score, chromosome_data, timestamp, metadata FROM memories ORDER BY fitness_score DESC LIMIT ?",
                 (n,)
@@ -51,6 +66,6 @@ class EvolutionaryMemory:
         self.store(chrom_id, gen, score, data)
 
     def count(self) -> int:
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM memories")
             return cursor.fetchone()[0]

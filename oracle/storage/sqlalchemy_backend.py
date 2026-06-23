@@ -7,6 +7,7 @@ import time
 import hashlib
 import logging
 from typing import Optional, Any
+from contextlib import contextmanager
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, Text, Boolean,
     Index, MetaData, Table, JSON
@@ -96,8 +97,17 @@ class StorageBackend:
         Base.metadata.create_all(self.engine)
         self.SessionFactory = sessionmaker(bind=self.engine)
 
-    def _session(self) -> Session:
-        return self.SessionFactory()
+    @contextmanager
+    def _session(self):
+        """Context manager for SQLAlchemy sessions with proper cleanup."""
+        session = self.SessionFactory()
+        try:
+            yield session
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     def store_experiment(self, data: dict) -> None:
         with self._session() as session:

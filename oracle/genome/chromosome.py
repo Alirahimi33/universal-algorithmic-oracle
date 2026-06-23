@@ -2,9 +2,12 @@
 import random
 import hashlib
 import math
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 from .gene import Gene
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -146,6 +149,11 @@ class Chromosome:
         
         # If cycle detected, return all nodes anyway
         if len(topo) != len(self.genes):
+            logger.warning(
+                "Cycle detected in chromosome graph edges. "
+                "Edges: %s. Falling back to arbitrary execution order.",
+                self.edges
+            )
             return list(self.genes.keys())
         return topo
 

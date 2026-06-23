@@ -4,6 +4,7 @@ import json
 import time
 import hashlib
 from typing import Any
+from contextlib import contextmanager
 
 
 class ChromosomeArchive:
@@ -13,8 +14,22 @@ class ChromosomeArchive:
         self.db_path = db_path
         self._init_db()
 
+    @contextmanager
+    def _connect(self):
+        """Context manager for database connections with WAL mode."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS best_chromosomes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +75,7 @@ class ChromosomeArchive:
         if existing and score <= existing[0].get("fitness_score", 0):
             return ""
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO best_chromosomes 
                 (chromosome_id, generation, fitness_score, prediction_accuracy,
@@ -85,7 +100,7 @@ class ChromosomeArchive:
 
     def get_best(self, n: int = 10) -> list[dict]:
         """Get the best chromosomes ever saved."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute("""
                 SELECT chromosome_id, generation, fitness_score, prediction_accuracy,
                        chromosome_data, system_configs, custom_formulas, fusion_rules,
@@ -116,7 +131,7 @@ class ChromosomeArchive:
                                   population_size: int, best_chromosome_id: str,
                                   snapshot_data: dict = None):
         """Save a snapshot of a generation for history."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute("""
                 INSERT INTO generation_snapshots 
                 (generation, best_fitness, avg_fitness, best_prediction_accuracy,
@@ -133,7 +148,7 @@ class ChromosomeArchive:
 
     def get_generation_history(self, n: int = 50) -> list[dict]:
         """Get the generation history."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute("""
                 SELECT generation, best_fitness, avg_fitness, best_prediction_accuracy,
                        difficulty_level, benchmark_accuracy, population_size,
@@ -158,7 +173,7 @@ class ChromosomeArchive:
 
     def load_chromosome_data(self, chromosome_id: str) -> dict | None:
         """Load full chromosome data by ID."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute("""
                 SELECT chromosome_data FROM best_chromosomes WHERE chromosome_id = ?
             """, (chromosome_id,))
@@ -169,7 +184,7 @@ class ChromosomeArchive:
 
     def get_stats(self) -> dict:
         """Get archive statistics."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             chrom_count = conn.execute("SELECT COUNT(*) FROM best_chromosomes").fetchone()[0]
             gen_count = conn.execute("SELECT COUNT(*) FROM generation_snapshots").fetchone()[0]
             best = conn.execute("SELECT MAX(fitness_score) FROM best_chromosomes").fetchone()[0]
@@ -183,7 +198,7 @@ class ChromosomeArchive:
 
     def _cleanup_old(self, limit: int = 100):
         """Keep only the best N chromosomes."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.execute("""
                 DELETE FROM best_chromosomes WHERE id NOT IN (
                     SELECT id FROM best_chromosomes ORDER BY fitness_score DESC LIMIT ?

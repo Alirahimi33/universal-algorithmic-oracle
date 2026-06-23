@@ -6,6 +6,7 @@ and health checks.
 import time
 import logging
 from typing import Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -14,10 +15,23 @@ from ..runtime.executor import OraclePipeline
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup/shutdown events."""
+    global _pipeline
+    _pipeline = OraclePipeline()
+    app.state.start_time = time.time()
+    logger.info("Oracle API started, loaded %d symbolic systems", len(_pipeline.get_available_systems()))
+    yield
+    logger.info("Oracle API shutting down")
+
+
 app = FastAPI(
     title="Universal Algorithmic Oracle API",
     description="REST API for the evolved symbolic oracle system",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 _pipeline: Optional[OraclePipeline] = None
@@ -66,13 +80,6 @@ def get_pipeline() -> OraclePipeline:
     if _pipeline is None:
         _pipeline = OraclePipeline()
     return _pipeline
-
-
-@app.on_event("startup")
-async def startup():
-    global _pipeline
-    _pipeline = OraclePipeline()
-    logger.info("Oracle API started, loaded %d symbolic systems", len(_pipeline.get_available_systems()))
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -125,11 +132,6 @@ async def health_check():
         system_count=len(pipeline.get_available_systems()),
         uptime=time.time() - app.state.start_time if hasattr(app.state, "start_time") else 0.0,
     )
-
-
-@app.on_event("startup")
-async def record_start_time():
-    app.state.start_time = time.time()
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8000):

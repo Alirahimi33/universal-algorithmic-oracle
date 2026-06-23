@@ -265,15 +265,16 @@ class OracleOutputBuilder:
         return contributions
 
     def _compute_fusion_info(self, chrom) -> dict:
+        has_feedback = False
+        if hasattr(chrom, 'edges') and chrom.edges:
+            sources = {src for src, _ in chrom.edges}
+            targets = {dst for _, dst in chrom.edges}
+            has_feedback = bool(sources & targets)
         return {
             "method": chrom.fusion_schema.get("method", "weighted_average")
             if hasattr(chrom, 'fusion_schema') else "weighted_average",
             "edge_count": len(chrom.edges) if hasattr(chrom, 'edges') else 0,
-            "has_feedback": any(
-                chrom.edges[i][1] == chrom.edges[j][0]
-                for i in range(len(chrom.edges))
-                for j in range(len(chrom.edges))
-            ) if hasattr(chrom, 'edges') else False,
+            "has_feedback": has_feedback,
         }
 
     def _compute_evolved_structure(self, chrom, systems: list[str]) -> dict:

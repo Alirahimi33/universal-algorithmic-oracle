@@ -11,6 +11,8 @@ from .chromosome_archive import ChromosomeArchive
 class GenerationalMemory:
     """Memory system that learns from previous generations' successes."""
 
+    MAX_SUCCESSFUL_PATTERNS = 1000
+
     def __init__(self, config: dict = None):
         config = config or {}
         self.archive = ChromosomeArchive(config.get("archive_path", "data/generational_memory.db"))
@@ -33,6 +35,8 @@ class GenerationalMemory:
 
             pattern = self._extract_pattern(chromosome)
             self.successful_patterns.append(pattern)
+            if len(self.successful_patterns) > self.MAX_SUCCESSFUL_PATTERNS:
+                self.successful_patterns = self.successful_patterns[-self.MAX_SUCCESSFUL_PATTERNS:]
 
             self._update_experience_weights(chromosome, score)
 
